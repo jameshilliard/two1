@@ -13,6 +13,7 @@ from two1.lib.wallet.exceptions import DaemonizerError
 from two1.lib.wallet.two1_wallet import Two1Wallet
 from two1.lib.wallet.two1_wallet import Wallet
 from two1.lib.server.machine_auth_wallet import MachineAuthWallet
+from two1.lib.channels import PaymentChannelClient
 from two1.lib.wallet import test_wallet
 from two1.lib.util.uxstring import UxString
 
@@ -38,6 +39,15 @@ def load_dotenv(dotenv_path):
         os.environ.setdefault(k, v)
     return True
 
+def get_device_uuid():
+    uuid = None
+    try:
+        with open("/proc/device-tree/hat/uuid", "r") as f:
+            uuid = f.readline().strip("\x00\n")
+    except FileNotFoundError:
+        pass
+    return uuid
+
 base_dir = str(Path(__file__).parents[2])
 dotenv_path = join(base_dir, '.env')
 
@@ -56,6 +66,7 @@ TWO1_LOGGER_SERVER = os.environ.get("TWO1_LOGGER_SERVER", "http://logger.21.co")
 TWO1_POOL_URL = os.environ.get("TWO1_POOL_URL", "swirl+tcp://grid.21.co:21006")
 TWO1_MERCHANT_HOST = os.environ.get("TWO1_MERCHANT_HOST", "http://market.21.co")
 TWO1_VERSION = two1.__version__
+TWO1_DEVICE_ID = os.environ.get("TWO1_DEVICE_ID") or get_device_uuid()
 
 try:
     TWO1_PATH = os.path.dirname(sys.argv[0])
@@ -74,7 +85,7 @@ class Config(object):
             os.makedirs(TWO1_USER_FOLDER)
         self.file = path(config_file).expand().abspath()
         self.dir = self.file.parent
-        self.defaults = {}  # TODO: Rename this var. Those are not the defaults but the
+        self.defaults = {}  # TODO: Rename this var. Those are not the defaults but the actual values.
         self.json_output = False # output in json
         #  actual config.
         self.load()
@@ -136,6 +147,7 @@ class Config(object):
             self.wallet = Wallet(wallet_path=wallet_path,
                                  data_provider=dp)
             self.machine_auth = MachineAuthWallet(self.wallet)
+            self.channel_client = PaymentChannelClient(self.wallet)
         else:
             # This branch is hit when '21 help' or '21 update' is invoked
             pass
@@ -249,16 +261,6 @@ class Config(object):
 
     def __repr__(self):
         return "<Config\n%s>" % self.fmt()
-
-
-def get_device_uuid():
-    uuid = None
-    try:
-        with open("/proc/device-tree/hat/uuid", "r") as f:
-            uuid = f.readline().strip("\x00\n")
-    except FileNotFoundError:
-        pass
-    return uuid
 
 # IMPORTANT: Suppose you want to invoke a command as a function
 # for the purpose of testing, eg:

@@ -54,6 +54,7 @@ class UxString:
                    "log in with"
     login_prompt_invalid_user = "Please select a number between {} and {} to select the " \
                                 "corresponding username"
+    login_prompt_user_does_not_exist = "User {} does not exist or is not authorized for this wallet/device.\n"
 
     # status
     status_exit_message = "\nUse {} to buy API calls for bitcoin from 21.co.\nFor help, do {}."
@@ -71,18 +72,39 @@ class UxString:
     status_wallet = click.style("Balance", fg='magenta') + """
     Your spendable balance at 21.co [1]                       : {twentyone_balance} Satoshis
     Your spendable balance on the Blockchain [2]              : {onchain} Satoshis
+    Your spendable balance in Payment Channels                : {channels_balance} Satoshis
     Amount flushing from 21.co balance to Blockchain balance  : {flushing} Satoshis
 
-    [1]: Available for off-chain (21.co/micropayments)
-    [2]: Available for on-chain (21.co/micropayments)
-
-    {byaddress}
+    [1]: Available for off-chain transactions
+    [2]: Available for on-chain and payment channel transactions
+    (See 21.co/micropayments for more details)
     """
+
+    status_wallet_detail_off = """\
+    To see all wallet addresses/payment channels, use '21 status --detail'\n"""
+
+    status_wallet_detail_on = """\
+    Addresses:\n{addresses}
+    Channels:\n{channels}"""
+
+    status_wallet_address = "\t{}: {} (confirmed), {} (total)\n"
+    status_wallet_channel = "\t{}://{}/ {}, {} Satoshis, {}\n"
+    status_wallet_channels_none = "\tNo payment channels have been created yet.\n"
 
     status_buyable = click.style("How many API calls can you buy?", fg='magenta') + """
     Search Queries        : {buyable_searches:<4} ({search_unit_price} Satoshis per search)
     SMS Messages          : {buyable_sms:<4} ({sms_unit_price} Satoshis per SMS)
     """
+
+    # buy
+    buy_channel_warning = "Note: The default payment channel size is " + \
+        "{} Satoshis. \nIn order to open this channel you’ll need to " + \
+        "spend a small amount extra to cover transaction fees and costs.\n" + \
+        "In addition, your *first* purchase will spend {} of your " + \
+        "outstanding balance in the channel for merchant insurance.\n" + \
+        "Read more at (https://21.co/micropayments/)\n" + \
+        "Proceed?"
+    buy_channel_aborted = "Payment aborted."
 
     # doctor
     doctor_start = click.style("21.co Doctor", fg='green') + "\n\n" + \
@@ -174,13 +196,42 @@ For further information, please contact %s""" % \
   (coming_soon, slack_21_co, support_21_co)
 
     # sell
-    sell_stub = """%s
-- Full sell functionality will be available in a forthcoming 21 update
-- To get started, please see 21.co/learn/sell-or-license-any-file-for-bitcoin
-- Then visit the 21 Developer Community at %s
-- There, you can find other 21 developers to buy your machine-payable endpoints
-For further information, please contact %s""" % \
-  (coming_soon, slack_21_co, support_21_co)
+    app_directory_valid = click.style("App Directory Valid...", fg="magenta")
+    app_directory_invalid = click.style("App Directory Invalid. Please ensure \
+your directory and it's contents are correct,\
+refer to 21.co/app for futher instructions.", fg="red")
+    installing_requirements = click.style(
+        "Installing requirements...", fg="magenta")
+    installed_requirements = click.style(
+        "Successfully installed requirements...", fg="magenta")
+    created_nginx_server = click.style(
+        "Created default 21 nginx server...", fg="magenta")
+    created_site_includes = click.style(
+        "Created site-includes to host apps...",
+        fg="magenta")
+    created_systemd_file = click.style("Systemd file created...", fg="magenta")
+    created_app_nginx_file = click.style("Nginx file created...", fg="magenta")
+    hosted_app_location = click.style(
+        "Your app is now hosted at http://0.0.0.0/{}",
+        fg="magenta")
+    listing_enabled_apps = click.style("Listing enabled apps...", fg="magenta")
+    no_apps_currently_running = click.style(
+            "No apps currently running, refer to 21.co/sell to host some...",
+            fg="red")
+    successfully_stopped_app = click.style(
+        "Successfully stopped {}...",
+        fg="magenta")
+    app_not_enabled = click.style(
+        "This app is not within your enabled apps.", fg="red")
+    failed_to_destroy_app = click.style(
+        "Failed to destroy app, please contact support@21.co", fg="red")
+    check_or_create_manifest_file = click.style(
+        "Checking or creating manifest file...", fg="magenta")
+    success_manifest = click.style(
+        "Successfully found or created manifest file...", fg="magenta")
+    manifest_fail = click.style(
+        "Failed to create manifest file, please contact support@21.co",
+        fg="red")
 
     # search
     search_stub = """%s

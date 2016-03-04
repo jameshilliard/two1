@@ -1,10 +1,17 @@
 import click
+import urllib.parse
+import collections
+import two1.lib.channels as channels
+from two1.lib.channels.cli import format_expiration_time
 from tabulate import tabulate
 from two1.lib.server import rest_client
 from two1.commands.config import TWO1_HOST
 from two1.lib.server.analytics import capture_usage
 from two1.lib.util.decorators import json_output
 from two1.lib.util.uxstring import UxString
+
+Balances = collections.namedtuple('Balances', ['twentyone', 'onchain', 'pending', 'flushed', 'channels'])
+
 
 def has_bitcoinkit():
     """Quick check for presence of mining chip via file presence.
@@ -136,30 +143,42 @@ SMS_UNIT_PRICE = 1000
 def status_wallet(config, client, detail=False):
     """Print wallet status to the command line.
     """
-    twentyone_balance, onchain, pending_transactions, flushed_earnings = \
-        _get_balances(config, client)
+    user_balances = _get_balances(config, client)
+
+    status_wallet = {
+        "twentyone_balance": user_balances.twentyone,
+        "onchain": user_balances.onchain,
+        "flushing": user_balances.flushed,
+        "channels_balance": user_balances.channels
+    }
+    config.log(UxString.status_wallet.format(**status_wallet))
 
     if detail:
         # show balances by address for default wallet
         address_balances = config.wallet.balances_by_address(0)
-        byaddress = ["Addresses:"]
+        status_addresses = []
         for addr, balances in address_balances.items():
             if balances['confirmed'] > 0 or balances['total'] > 0:
-                byaddress.append("{}: {} (confirmed), {} (total)".format(
+                status_addresses.append(UxString.status_wallet_address.format(
                     addr, balances['confirmed'], balances['total']))
-        byaddress = '\n      '.join(byaddress)
+
+        # Display status for all payment channels
+        status_channels = []
+        for url in config.channel_client.list():
+            status = config.channel_client.status(url)
+            url = urllib.parse.urlparse(url)
+            status_channels.append(UxString.status_wallet_channel.format(
+                url.scheme, url.netloc, status.state, status.balance,
+                format_expiration_time(status.expiration_time)))
+        if not len(status_channels):
+            status_channels = [UxString.status_wallet_channels_none]
+
+        config.log(UxString.status_wallet_detail_on.format(
+            addresses=''.join(status_addresses), channels=''.join(status_channels)))
     else:
-        byaddress = "To see all wallet addresses, do 21 status --detail"
+        config.log(UxString.status_wallet_detail_off)
 
-    status_wallet = {
-        "twentyone_balance": twentyone_balance,
-        "onchain": onchain,
-        "flushing": flushed_earnings,
-        "byaddress": byaddress
-    }
-    config.log(UxString.status_wallet.format(**status_wallet))
-
-    total_balance = twentyone_balance + onchain
+    total_balance = user_balances.twentyone + user_balances.onchain
     buyable_searches = int(total_balance / SEARCH_UNIT_PRICE)
     buyable_sms = int(total_balance / SMS_UNIT_PRICE)
     status_buyable = {
@@ -196,7 +215,13 @@ def _get_balances(config, client):
     twentyone_balance = data["total_earnings"]
     flushed_earnings = data["flushed_amount"]
 
-    return twentyone_balance, spendable_balance, pending_transactions, flushed_earnings
+    config.channel_client.sync()
+    channel_urls = config.channel_client.list()
+    channels_balance = sum(s.balance for s in (config.channel_client.status(url) for url in channel_urls)
+                           if s.state == channels.PaymentChannelState.READY)
+
+    return Balances(twentyone_balance, spendable_balance, pending_transactions,
+                    flushed_earnings, channels_balance)
 
 
 def status_earnings(config, client):
